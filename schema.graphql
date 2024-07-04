@@ -96,3 +96,9 @@ type Balance {
   asset: String! @index
   user: String! @index
 }
+
+# Новый тип для хранения последних 100 ордеров
+type LatestOrders {
+  id: ID!
+  order_ids: [String!]!
+}

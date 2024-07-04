@@ -1,71 +1,57 @@
 import { OrderBookContract } from "generated";
-import { orderStatus } from "generated/src/Enums.gen";
+import { orderStatus, OrderType, AssetType } from "generated/src/Enums.gen";
 import { nanoid } from "nanoid";
 import crypto from 'crypto';
 
+function updateLatestOrders(context: any, orderId: string) {
+  let latestOrders = context.LatestOrders.get('latest');
+  if (!latestOrders) {
+    latestOrders = { id: 'latest', order_ids: [] };
+  }
 
-function tai64ToDate(tai64: bigint) {
-  const dateStr = (
-    (tai64 - BigInt(Math.pow(2, 62)) - BigInt(10)) *
-    1000n
-  ).toString();
-  return new Date(+dateStr).toISOString();
+  latestOrders.order_ids.push(orderId);
+  latestOrders.order_ids = latestOrders.order_ids.slice(-100);
+
+  context.LatestOrders.set(latestOrders);
 }
 
-function decodeI64(i64: {
-  readonly value: bigint;
-  readonly negative: boolean;
-}) {
-  return (i64.negative ? "-" : "") + i64.value.toString();
-}
-
-/* 
-pub struct OpenOrderEvent {
-  pub order_id: b256,
-  pub asset: AssetId,
-  pub amount: u64,
-  pub asset_type: AssetType,
-  pub order_type: OrderType,
-  pub price: u64,
-  pub user: Identity,
-}
-*/
-OrderBookContract.OpenOrderEvent.loader(({ event, context }) => {
+OrderBookContract.OpenOrderEvent.loader(async ({ event, context }) => {
   context.Order.load(event.data.order_id);
+  context.LatestOrders.load('latest');
 });
-OrderBookContract.OpenOrderEvent.handler(({ event, context }) => {
+
+OrderBookContract.OpenOrderEvent.handler(async ({ event, context }) => {
   const openOrderEvent = {
     id: nanoid(),
     order_id: event.data.order_id,
     tx_id: event.transactionId,
     asset: event.data.asset.bits,
     amount: event.data.amount,
-    asset_type: event.data.asset_type.case,
-    order_type: event.data.order_type.case,
+    asset_type: event.data.asset_type.case as AssetType,
+    order_type: event.data.order_type.case as OrderType,
     price: event.data.price,
     user: event.data.user.payload.bits,
     timestamp: new Date(event.time * 1000).toISOString(),
   };
   context.OpenOrderEvent.set(openOrderEvent);
 
-  let order = {
+  const order = {
     ...openOrderEvent,
     id: event.data.order_id,
     initial_amount: event.data.amount,
-    status: "Active" as orderStatus
+    status: "Active" as orderStatus,
   };
   context.Order.set(order);
+
+  updateLatestOrders(context, order.id);
 });
 
-/* 
-pub struct CancelOrderEvent {
-  pub order_id: b256,
-}
-*/
-OrderBookContract.CancelOrderEvent.loader(({ event, context }) => {
+OrderBookContract.CancelOrderEvent.loader(async ({ event, context }) => {
   context.Order.load(event.data.order_id);
+  context.LatestOrders.load('latest');
 });
-OrderBookContract.CancelOrderEvent.handler(({ event, context }) => {
+
+OrderBookContract.CancelOrderEvent.handler(async ({ event, context }) => {
   const cancelOrderEvent = {
     id: nanoid(),
     order_id: event.data.order_id,
@@ -75,29 +61,25 @@ OrderBookContract.CancelOrderEvent.handler(({ event, context }) => {
 
   context.CancelOrderEvent.set(cancelOrderEvent);
 
-  let order = context.Order.get(event.data.order_id);
-  if (order != null) {
-    context.Order.set({ ...order, amount: 0n, status: "Canceled", timestamp: new Date(event.time * 1000).toISOString() });
+  const order = context.Order.get(event.data.order_id);
+  if (order) {
+    context.Order.set({
+      ...order,
+      amount: 0n,
+      status: "Canceled",
+      timestamp: new Date(event.time * 1000).toISOString(),
+    });
   } else {
     context.log.error(`Cannot find an order ${event.data.order_id}`);
   }
 });
 
-/* 
-pub struct MatchOrderEvent {
-  pub order_id: b256,
-  pub asset: AssetId,
-  pub order_matcher: Identity,
-  pub owner: Identity,
-  pub counterparty: Identity,
-  pub match_size: u64,
-  pub match_price: u64,
-}
-*/
-OrderBookContract.MatchOrderEvent.loader(({ event, context }) => {
+OrderBookContract.MatchOrderEvent.loader(async ({ event, context }) => {
   context.Order.load(event.data.order_id);
+  context.LatestOrders.load('latest');
 });
-OrderBookContract.MatchOrderEvent.handler(({ event, context }) => {
+
+OrderBookContract.MatchOrderEvent.handler(async ({ event, context }) => {
   const matchOrderEvent = {
     id: nanoid(),
     order_id: event.data.order_id,
@@ -112,58 +94,50 @@ OrderBookContract.MatchOrderEvent.handler(({ event, context }) => {
   };
   context.MatchOrderEvent.set(matchOrderEvent);
 
-  let order = context.Order.get(event.data.order_id);
-  if (order != null) {
+  const order = context.Order.get(event.data.order_id);
+  if (order) {
     const amount = order.amount - event.data.match_size;
-    context.Order.set({ ...order, amount, status: amount == 0n ? "Closed" : "Active", timestamp: new Date(event.time * 1000).toISOString() });
+    context.Order.set({
+      ...order,
+      amount,
+      status: amount === 0n ? "Closed" : "Active",
+      timestamp: new Date(event.time * 1000).toISOString(),
+    });
+    updateLatestOrders(context, order.id);
   } else {
     context.log.error(`Cannot find an order ${event.data.order_id}`);
   }
 });
 
-// pub struct TradeOrderEvent {
-//     pub base_sell_order_id: b256,
-//     pub base_buy_order_id: b256,
-//     pub order_matcher: Identity,
-//     pub trade_size: u64,
-//     pub trade_price: u64,
-//     pub block_height: u32,
-//     pub tx_id: b256,
-// }
+OrderBookContract.TradeOrderEvent.loader(async ({ event, context }) => {
+  context.LatestOrders.load('latest');
+});
 
-OrderBookContract.TradeOrderEvent.loader(({ event, context }) => { });
-OrderBookContract.TradeOrderEvent.handler(({ event, context }) => {
+OrderBookContract.TradeOrderEvent.handler(async ({ event, context }) => {
   const idSource = `${event.data.order_matcher}-${event.data.trade_size}-${event.data.trade_price}-${event.data.base_sell_order_id}-${event.data.base_buy_order_id}-${event.data.tx_id}`;
   const id = crypto.createHash('sha256').update(idSource).digest('hex');
   const tradeOrderEvent = {
-    id: id,
+    id,
     base_sell_order_id: event.data.base_sell_order_id,
     base_buy_order_id: event.data.base_buy_order_id,
     tx_id: event.transactionId,
     order_matcher: event.data.order_matcher.payload.bits,
     trade_size: event.data.trade_size,
     trade_price: event.data.trade_price,
-    // block_height: event.data.block_height,
     timestamp: new Date(event.time * 1000).toISOString(),
   };
 
   context.TradeOrderEvent.set(tradeOrderEvent);
 });
 
-
-/* 
-pub struct DepositEvent {
-  pub amount: u64,
-  pub asset: AssetId,
-  pub user: Identity,
-}
-*/
-OrderBookContract.DepositEvent.loader(({ event, context }) => {
+OrderBookContract.DepositEvent.loader(async ({ event, context }) => {
   const idSource = `${event.data.asset.bits}-${event.data.user.payload.bits}`;
   const id = crypto.createHash('sha256').update(idSource).digest('hex');
   context.Balance.load(id);
+  context.LatestOrders.load('latest');
 });
-OrderBookContract.DepositEvent.handler(({ event, context }) => {
+
+OrderBookContract.DepositEvent.handler(async ({ event, context }) => {
   const depositEvent = {
     id: nanoid(),
     tx_id: event.transactionId,
@@ -177,7 +151,7 @@ OrderBookContract.DepositEvent.handler(({ event, context }) => {
   const idSource = `${event.data.asset.bits}-${event.data.user.payload.bits}`;
   const id = crypto.createHash('sha256').update(idSource).digest('hex');
   let balance = context.Balance.get(id);
-  if (balance != null) {
+  if (balance) {
     const amount = balance.amount + event.data.amount;
     context.Balance.set({ ...balance, amount });
   } else {
@@ -185,19 +159,14 @@ OrderBookContract.DepositEvent.handler(({ event, context }) => {
   }
 });
 
-/* 
-pub struct WithdrawEvent {
-  pub amount: u64,
-  pub asset: AssetId,
-  pub user: Identity,
-}
-*/
-OrderBookContract.WithdrawEvent.loader(({ event, context }) => {
+OrderBookContract.WithdrawEvent.loader(async ({ event, context }) => {
   const idSource = `${event.data.asset.bits}-${event.data.user.payload.bits}`;
   const id = crypto.createHash('sha256').update(idSource).digest('hex');
   context.Balance.load(id);
+  context.LatestOrders.load('latest');
 });
-OrderBookContract.WithdrawEvent.handler(({ event, context }) => {
+
+OrderBookContract.WithdrawEvent.handler(async ({ event, context }) => {
   const withdrawEvent = {
     id: nanoid(),
     tx_id: event.transactionId,
@@ -211,7 +180,7 @@ OrderBookContract.WithdrawEvent.handler(({ event, context }) => {
   const idSource = `${event.data.asset.bits}-${event.data.user.payload.bits}`;
   const id = crypto.createHash('sha256').update(idSource).digest('hex');
   let balance = context.Balance.get(id);
-  if (balance != null) {
+  if (balance) {
     const amount = balance.amount - event.data.amount;
     context.Balance.set({ ...balance, amount });
   } else {
@@ -219,12 +188,13 @@ OrderBookContract.WithdrawEvent.handler(({ event, context }) => {
   }
 });
 
+// function tai64ToDate(tai64: bigint): string {
+//   const dateStr = (
+//     (tai64 - BigInt(2) ** BigInt(62) - BigInt(10)) * BigInt(1000)
+//   ).toString();
+//   return new Date(+dateStr).toISOString();
+// }
 
-/*
-pub struct SetFeeEvent {
-  pub amount: u64,
-  pub user: Option<Identity>,
-}
-*/
-// OrderBookContract.WithdrawEvent.loader(({ event, context }) => { });
-// OrderBookContract.WithdrawEvent.handler(({ event, context }) => {});
+// function decodeI64(i64: { readonly value: bigint; readonly negative: boolean }): string {
+//   return (i64.negative ? "-" : "") + i64.value.toString();
+// }
