@@ -2,7 +2,7 @@ import { OrderBookContract } from "generated";
 import { orderStatus } from "generated/src/Enums.gen";
 import { nanoid } from "nanoid";
 import crypto from 'crypto';
-
+import notifyClients from './websocketServer';
 
 function tai64ToDate(tai64: bigint) {
   const dateStr = (
@@ -47,6 +47,7 @@ OrderBookContract.OpenOrderEvent.handler(({ event, context }) => {
     timestamp: new Date(event.time * 1000).toISOString(),
   };
   context.OpenOrderEvent.set(openOrderEvent);
+  notifyClients('OpenOrderEvent', openOrderEvent);
 
   let order = {
     ...openOrderEvent,
@@ -74,6 +75,7 @@ OrderBookContract.CancelOrderEvent.handler(({ event, context }) => {
   };
 
   context.CancelOrderEvent.set(cancelOrderEvent);
+  notifyClients('CancelOrderEvent', cancelOrderEvent);
 
   let order = context.Order.get(event.data.order_id);
   if (order != null) {
@@ -111,6 +113,7 @@ OrderBookContract.MatchOrderEvent.handler(({ event, context }) => {
     timestamp: new Date(event.time * 1000).toISOString(),
   };
   context.MatchOrderEvent.set(matchOrderEvent);
+  notifyClients('MatchOrderEvent', matchOrderEvent);
 
   let order = context.Order.get(event.data.order_id);
   if (order != null) {
