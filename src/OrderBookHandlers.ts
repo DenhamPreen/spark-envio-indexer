@@ -2,22 +2,43 @@ import { OrderBookContract } from "generated";
 import { orderStatus, OrderType, AssetType } from "generated/src/Enums.gen";
 import { nanoid } from "nanoid";
 import crypto from 'crypto';
+import WebSocket from 'ws';
 
-function updateLatestOrders(context: any, orderId: string) {
+const wss = new WebSocket.Server({ port: 8080 });
+
+function sendWebSocketMessage(message: any) {
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(message));
+    }
+  });
+}
+
+function updateLatestOrders(context: any, orderId: string, action: "add" | "remove") {
   let latestOrders = context.LatestOrders.get('latest');
   if (!latestOrders) {
     latestOrders = { id: 'latest', order_ids: [] };
   }
 
-  latestOrders.order_ids.push(orderId);
-  latestOrders.order_ids = latestOrders.order_ids.slice(-100);
+  if (action === "add") {
+    if (!latestOrders.order_ids.includes(orderId)) {
+      latestOrders.order_ids.push(orderId);
+      latestOrders.order_ids = latestOrders.order_ids.slice(-100);
+      sendWebSocketMessage({ action: "add", orderId });
+    } else {
+      context.log.warn(`Duplicate order id found: ${orderId}`);
+    }
+  } else if (action === "remove") {
+    latestOrders.order_ids = latestOrders.order_ids.filter((id: string) => id !== orderId);
+    sendWebSocketMessage({ action: "remove", orderId });
+  }
 
   context.LatestOrders.set(latestOrders);
 }
 
 OrderBookContract.OpenOrderEvent.loader(async ({ event, context }) => {
-  context.Order.load(event.data.order_id);
-  context.LatestOrders.load('latest');
+  await context.Order.load(event.data.order_id);
+  await context.LatestOrders.load('latest');
 });
 
 OrderBookContract.OpenOrderEvent.handler(async ({ event, context }) => {
@@ -33,7 +54,7 @@ OrderBookContract.OpenOrderEvent.handler(async ({ event, context }) => {
     user: event.data.user.payload.bits,
     timestamp: new Date(event.time * 1000).toISOString(),
   };
-  context.OpenOrderEvent.set(openOrderEvent);
+  await context.OpenOrderEvent.set(openOrderEvent);
 
   const order = {
     ...openOrderEvent,
@@ -41,14 +62,14 @@ OrderBookContract.OpenOrderEvent.handler(async ({ event, context }) => {
     initial_amount: event.data.amount,
     status: "Active" as orderStatus,
   };
-  context.Order.set(order);
+  await context.Order.set(order);
 
-  updateLatestOrders(context, order.id);
+  updateLatestOrders(context, order.id, "add");
 });
 
 OrderBookContract.CancelOrderEvent.loader(async ({ event, context }) => {
-  context.Order.load(event.data.order_id);
-  context.LatestOrders.load('latest');
+  await context.Order.load(event.data.order_id);
+  await context.LatestOrders.load('latest');
 });
 
 OrderBookContract.CancelOrderEvent.handler(async ({ event, context }) => {
@@ -59,24 +80,25 @@ OrderBookContract.CancelOrderEvent.handler(async ({ event, context }) => {
     timestamp: new Date(event.time * 1000).toISOString(),
   };
 
-  context.CancelOrderEvent.set(cancelOrderEvent);
+  await context.CancelOrderEvent.set(cancelOrderEvent);
 
-  const order = context.Order.get(event.data.order_id);
+  const order = await context.Order.get(event.data.order_id);
   if (order) {
-    context.Order.set({
+    await context.Order.set({
       ...order,
       amount: 0n,
       status: "Canceled",
       timestamp: new Date(event.time * 1000).toISOString(),
     });
+    updateLatestOrders(context, order.id, "remove");
   } else {
     context.log.error(`Cannot find an order ${event.data.order_id}`);
   }
 });
 
 OrderBookContract.MatchOrderEvent.loader(async ({ event, context }) => {
-  context.Order.load(event.data.order_id);
-  context.LatestOrders.load('latest');
+  await context.Order.load(event.data.order_id);
+  await context.LatestOrders.load('latest');
 });
 
 OrderBookContract.MatchOrderEvent.handler(async ({ event, context }) => {
@@ -92,25 +114,27 @@ OrderBookContract.MatchOrderEvent.handler(async ({ event, context }) => {
     match_price: event.data.match_price,
     timestamp: new Date(event.time * 1000).toISOString(),
   };
-  context.MatchOrderEvent.set(matchOrderEvent);
+  await context.MatchOrderEvent.set(matchOrderEvent);
 
-  const order = context.Order.get(event.data.order_id);
+  const order = await context.Order.get(event.data.order_id);
   if (order) {
     const amount = order.amount - event.data.match_size;
-    context.Order.set({
+    await context.Order.set({
       ...order,
       amount,
       status: amount === 0n ? "Closed" : "Active",
       timestamp: new Date(event.time * 1000).toISOString(),
     });
-    updateLatestOrders(context, order.id);
+    if (amount === 0n) {
+      updateLatestOrders(context, order.id, "remove");
+    }
   } else {
     context.log.error(`Cannot find an order ${event.data.order_id}`);
   }
 });
 
 OrderBookContract.TradeOrderEvent.loader(async ({ event, context }) => {
-  context.LatestOrders.load('latest');
+  await context.LatestOrders.load('latest');
 });
 
 OrderBookContract.TradeOrderEvent.handler(async ({ event, context }) => {
@@ -127,14 +151,14 @@ OrderBookContract.TradeOrderEvent.handler(async ({ event, context }) => {
     timestamp: new Date(event.time * 1000).toISOString(),
   };
 
-  context.TradeOrderEvent.set(tradeOrderEvent);
+  await context.TradeOrderEvent.set(tradeOrderEvent);
 });
 
 OrderBookContract.DepositEvent.loader(async ({ event, context }) => {
   const idSource = `${event.data.asset.bits}-${event.data.user.payload.bits}`;
   const id = crypto.createHash('sha256').update(idSource).digest('hex');
-  context.Balance.load(id);
-  context.LatestOrders.load('latest');
+  await context.Balance.load(id);
+  await context.LatestOrders.load('latest');
 });
 
 OrderBookContract.DepositEvent.handler(async ({ event, context }) => {
@@ -146,24 +170,24 @@ OrderBookContract.DepositEvent.handler(async ({ event, context }) => {
     user: event.data.user.payload.bits,
     timestamp: new Date(event.time * 1000).toISOString(),
   };
-  context.DepositEvent.set(depositEvent);
+  await context.DepositEvent.set(depositEvent);
 
   const idSource = `${event.data.asset.bits}-${event.data.user.payload.bits}`;
   const id = crypto.createHash('sha256').update(idSource).digest('hex');
-  let balance = context.Balance.get(id);
+  let balance = await context.Balance.get(id);
   if (balance) {
     const amount = balance.amount + event.data.amount;
-    context.Balance.set({ ...balance, amount });
+    await context.Balance.set({ ...balance, amount });
   } else {
-    context.Balance.set({ ...depositEvent, id });
+    await context.Balance.set({ ...depositEvent, id });
   }
 });
 
 OrderBookContract.WithdrawEvent.loader(async ({ event, context }) => {
   const idSource = `${event.data.asset.bits}-${event.data.user.payload.bits}`;
   const id = crypto.createHash('sha256').update(idSource).digest('hex');
-  context.Balance.load(id);
-  context.LatestOrders.load('latest');
+  await context.Balance.load(id);
+  await context.LatestOrders.load('latest');
 });
 
 OrderBookContract.WithdrawEvent.handler(async ({ event, context }) => {
@@ -175,26 +199,15 @@ OrderBookContract.WithdrawEvent.handler(async ({ event, context }) => {
     user: event.data.user.payload.bits,
     timestamp: new Date(event.time * 1000).toISOString(),
   };
-  context.WithdrawEvent.set(withdrawEvent);
+  await context.WithdrawEvent.set(withdrawEvent);
 
   const idSource = `${event.data.asset.bits}-${event.data.user.payload.bits}`;
   const id = crypto.createHash('sha256').update(idSource).digest('hex');
-  let balance = context.Balance.get(id);
+  let balance = await context.Balance.get(id);
   if (balance) {
     const amount = balance.amount - event.data.amount;
-    context.Balance.set({ ...balance, amount });
+    await context.Balance.set({ ...balance, amount });
   } else {
     context.log.error(`Cannot find a balance; user:${event.data.user}; asset: ${event.data.asset.bits}; id: ${id}`);
   }
 });
-
-// function tai64ToDate(tai64: bigint): string {
-//   const dateStr = (
-//     (tai64 - BigInt(2) ** BigInt(62) - BigInt(10)) * BigInt(1000)
-//   ).toString();
-//   return new Date(+dateStr).toISOString();
-// }
-
-// function decodeI64(i64: { readonly value: bigint; readonly negative: boolean }): string {
-//   return (i64.negative ? "-" : "") + i64.value.toString();
-// }
