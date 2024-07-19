@@ -3,7 +3,7 @@ import { orderStatus } from "generated/src/Enums.gen";
 import { nanoid } from "nanoid";
 import crypto from 'crypto';
 import resolversModule from './resolvers';
-const pubsub = resolversModule.pubsub;
+// const pubsub = resolversModule.pubsub;
 
 OrderBookContract.OpenOrderEvent.loader(({ event, context }) => {
   context.Order.load(event.data.order_id);
@@ -30,7 +30,7 @@ OrderBookContract.OpenOrderEvent.handler(({ event, context }) => {
     status: "Active" as orderStatus
   };
   context.Order.set(order);
-  pubsub.publish('ORDER_UPDATED', { orderUpdated: order });
+  // pubsub.publish('ORDER_UPDATED', { orderUpdated: order })
 });
 
 OrderBookContract.CancelOrderEvent.loader(({ event, context }) => {
@@ -51,8 +51,7 @@ OrderBookContract.CancelOrderEvent.handler(({ event, context }) => {
     const updatedOrder = { ...order, amount: 0n, status: "Canceled" as orderStatus, timestamp: new Date(event.time * 1000).toISOString() };
     context.Order.set(updatedOrder);
 
-    // Publish the update
-    pubsub.publish('ORDER_UPDATED', { orderUpdated: updatedOrder });
+    // pubsub.publish('ORDER_UPDATED', { orderUpdated: updatedOrder })
   } else {
     context.log.error(`Cannot find an order ${event.data.order_id}`);
   }
@@ -83,8 +82,7 @@ OrderBookContract.MatchOrderEvent.handler(({ event, context }) => {
     const updatedOrder = { ...order, amount, status: (amount == 0n ? "Closed" : "Active") as orderStatus, timestamp: new Date(event.time * 1000).toISOString() };
     context.Order.set(updatedOrder);
 
-    // Publish the update
-    pubsub.publish('ORDER_UPDATED', { orderUpdated: updatedOrder });
+    // pubsub.publish('ORDER_UPDATED', { orderUpdated: updatedOrder })
   } else {
     context.log.error(`Cannot find an order ${event.data.order_id}`);
   }
@@ -102,7 +100,6 @@ OrderBookContract.TradeOrderEvent.handler(({ event, context }) => {
     order_matcher: event.data.order_matcher.payload.bits,
     trade_size: event.data.trade_size,
     trade_price: event.data.trade_price,
-    // block_height: event.data.block_height,
     timestamp: new Date(event.time * 1000).toISOString(),
   };
 

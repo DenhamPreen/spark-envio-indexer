@@ -4,7 +4,7 @@ networks:
     start_block: 5300000
     contracts:
       - name: OrderBook
-        address: 0x08ca18ed550d6229f001641d43aac58e00f9eb7e25c9bea6d33716af61e43b2a
+        address: 0xf3b44eaeed7c31eb41f3df10fecf07b5c2f3585e32d22230c93a2f68b0c24b19
         abi_file_path: ./abis/spark-orderbook.json
         handler: ./src/OrderBookHandlers.ts
         events:
