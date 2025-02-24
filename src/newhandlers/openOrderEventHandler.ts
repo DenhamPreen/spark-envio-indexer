@@ -22,6 +22,7 @@ MarketOrder.OpenOrderEvent.handlerWithLoader({
 			asset: event.params.asset.bits,
 			amount: event.params.amount,
 			orderType: event.params.order_type.case,
+			limitType: event.params.limit_type.case,
 			price: event.params.price,
 			user: event.params.user.payload.bits,
 			baseAmount: event.params.balance.liquid.base,

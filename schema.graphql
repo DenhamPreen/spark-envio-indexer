@@ -3,6 +3,13 @@ enum OrderType {
   Buy
 }
 
+enum LimitType {
+  GTC
+  IOC
+  FOK
+  MKT
+}
+
 enum OrderStatus {
   Active
   Closed
@@ -27,6 +34,7 @@ type OpenOrderEvent {
   asset: String!
   amount: BigInt!
   orderType: OrderType!
+  limitType: LimitType
   price: BigInt!
   timestamp: String!
   txId: String! @index
@@ -38,6 +46,7 @@ type Order {
   asset: String! @index
   amount: BigInt!
   orderType: OrderType! @index
+  limitType: LimitType
   price: BigInt! @index
   user: String! @index
   status: OrderStatus! @index
@@ -51,6 +60,7 @@ type ActiveSellOrder {
   asset: String! @index
   amount: BigInt!
   orderType: OrderType! @index
+  limitType: LimitType
   price: BigInt! @index
   user: String! @index
   status: OrderStatus! @index
@@ -64,6 +74,7 @@ type ActiveBuyOrder {
   asset: String! @index
   amount: BigInt!
   orderType: OrderType! @index
+  limitType: LimitType
   price: BigInt! @index
   user: String! @index
   status: OrderStatus! @index
