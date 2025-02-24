@@ -34,7 +34,7 @@ networks:
           - name: TradeOrderEvent
       - name: MarketOrder
         address:
-          - 0x544ae99c3beb0a63599334fe2c7e49bfa43c69ceb716ca9913e60513a71a1c97 #tETH-tUSDC
+          - 0x6eb7a35c43a8eae0a2aeaf8c68b7d2d1cc7d2481d97abb8f68e4fb3cbab86a2a #tETH-tUSDC
         abi_file_path: ./abis/spark-market-abi.json
         handler: ./src/MarketOrderBookHandlers.ts
         events:
