@@ -22,7 +22,7 @@ _Please refer to the [documentation website](https://docs.envio.dev) for a thoro
 
    ```sh
    pnpm i
-   ```
+   ``` 
 
 4. Run envio codegen
 
