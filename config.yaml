@@ -22,6 +22,7 @@ networks:
           - 0x2eece85eb7c8ec5fd95e639fd6bb7e9dd7103a99d7321521848da246ecef5270 #PSYCHO-USDC
           - 0x59020aadb448c59b48136a3cef110f1ddd2865000146514924f19b83f061ceba #USDF-USDC
           - 0x979ea6b1e15c1ec8e79eb76b587af89dd2620b383082e9b2c16049b78e97e4e8 #USDT-ETH
+          - 0x6eb7a35c43a8eae0a2aeaf8c68b7d2d1cc7d2481d97abb8f68e4fb3cbab86a2a #tETH-tUSDC
           
         abi_file_path: ./abis/market.json
         handler: ./src/OrderBookHandlers.ts
@@ -32,15 +33,14 @@ networks:
           - name: OpenOrderEvent
           - name: CancelOrderEvent
           - name: TradeOrderEvent
-      - name: MarketOrder
-        address:
-          - 0x6eb7a35c43a8eae0a2aeaf8c68b7d2d1cc7d2481d97abb8f68e4fb3cbab86a2a #tETH-tUSDC
-        abi_file_path: ./abis/spark-market-abi.json
-        handler: ./src/MarketOrderBookHandlers.ts
-        events:
-          - name: DepositEvent
-          - name: WithdrawEvent
-          - name: WithdrawToMarketEvent
-          - name: OpenOrderEvent
-          - name: CancelOrderEvent
-          - name: TradeOrderEvent        
+      # # - name: MarketOrder
+      # #   address:
+      # #   abi_file_path: ./abis/spark-market-abi.json
+      # #   handler: ./src/MarketOrderBookHandlers.ts
+      # #   events:
+      # #     - name: DepositEvent
+      # #     - name: WithdrawEvent
+      # #     - name: WithdrawToMarketEvent
+      # #     - name: OpenOrderEvent
+      # #     - name: CancelOrderEvent
+      # #     - name: TradeOrderEvent        
