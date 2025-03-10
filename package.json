@@ -15,7 +15,6 @@
     "node": "20.x"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.3",
     "@types/mocha": "10.0.6",
     "@types/node": "20.8.8",
     "mocha": "10.2.0",
@@ -24,7 +23,7 @@
     "typescript": "5.2.2"
   },
   "dependencies": {
-    "envio": "2.12.0",
+    "envio": "2.13.0",
     "nanoid": "3.3.7"
   },
   "optionalDependencies": {
