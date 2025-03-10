@@ -41,6 +41,10 @@ Market.OpenOrderEvent.handlerWithLoader({
 			id: event.params.order_id,
 			initialAmount: event.params.amount,
 			status: "Active",
+			
+			priceSum: BigInt(0),
+			avrPrice: BigInt(0),
+			matched: 0
 		};
 		context.Order.set(order);
 

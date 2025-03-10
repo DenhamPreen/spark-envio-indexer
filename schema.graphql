@@ -52,6 +52,10 @@ type Order {
   status: OrderStatus! @index
   initialAmount: BigInt!
   timestamp: String!
+  
+  priceSum: BigInt! @index
+  avrPrice: BigInt! @index
+  matched: Int!
 }
 
 type ActiveSellOrder {
@@ -65,6 +69,7 @@ type ActiveSellOrder {
   user: String! @index
   status: OrderStatus! @index
   initialAmount: BigInt!
+  matched: Int!
   timestamp: String!
 }
 
@@ -79,6 +84,7 @@ type ActiveBuyOrder {
   user: String! @index
   status: OrderStatus! @index
   initialAmount: BigInt!
+  matched: Int!
   timestamp: String!
 }
 

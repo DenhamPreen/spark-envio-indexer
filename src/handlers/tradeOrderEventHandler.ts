@@ -74,6 +74,10 @@ Market.TradeOrderEvent.handlerWithLoader({
 				amount: updatedBuyAmount,
 				status: isBuyOrderClosed ? "Closed" : "Active",
 				timestamp: getISOTime(event.block.time),
+
+				matched: buyOrder.matched + 1,
+				priceSum: buyOrder.priceSum + tradeOrderEvent.tradePrice,
+				avrPrice: (buyOrder.priceSum + tradeOrderEvent.tradePrice) / BigInt(buyOrder.matched + 1)
 			};
 			context.Order.set(updatedBuyOrder);
 
@@ -97,6 +101,10 @@ Market.TradeOrderEvent.handlerWithLoader({
 				amount: updatedSellAmount,
 				status: isSellOrderClosed ? "Closed" : "Active",
 				timestamp: getISOTime(event.block.time),
+				
+				matched: sellOrder.matched + 1,
+				priceSum: sellOrder.priceSum + tradeOrderEvent.tradePrice,
+				avrPrice: (sellOrder.priceSum + sellOrder.price) / BigInt(sellOrder.matched + 1)
 			};
 			context.Order.set(updatedSellOrder);
 
@@ -151,6 +159,7 @@ Market.TradeOrderEvent.handlerWithLoader({
 				...activeBuyOrder,
 				amount: updatedActiveBuyAmount,
 				status: isActiveBuyOrderClosed ? "Closed" : "Active",
+				matched: activeBuyOrder.matched + 1,
 				timestamp: getISOTime(event.block.time),
 			};
 			context.ActiveBuyOrder.set(updatedActiveBuyOrder);
@@ -174,6 +183,7 @@ Market.TradeOrderEvent.handlerWithLoader({
 				...activeSellOrder,
 				amount: updatedActiveSellAmount,
 				status: isActiveSellOrderClosed ? "Closed" : "Active",
+				matched: activeSellOrder.matched + 1,
 				timestamp: getISOTime(event.block.time),
 			};
 			context.ActiveSellOrder.set(updatedActiveSellOrder);
