@@ -77,7 +77,7 @@ Market.TradeOrderEvent.handlerWithLoader({
 
 				matched: buyOrder.matched + 1,
 				priceSum: buyOrder.priceSum + tradeOrderEvent.tradePrice,
-				avrPrice: (buyOrder.priceSum + tradeOrderEvent.tradePrice) / BigInt(buyOrder.matched + 1)
+				avrPrice: (buyOrder.priceSum + tradeOrderEvent.tradePrice) / (BigInt(buyOrder.matched) + BigInt(1))
 			};
 			context.Order.set(updatedBuyOrder);
 
@@ -104,7 +104,7 @@ Market.TradeOrderEvent.handlerWithLoader({
 				
 				matched: sellOrder.matched + 1,
 				priceSum: sellOrder.priceSum + tradeOrderEvent.tradePrice,
-				avrPrice: (sellOrder.priceSum + sellOrder.price) / BigInt(sellOrder.matched + 1)
+				avrPrice: (sellOrder.priceSum + tradeOrderEvent.tradePrice) / (BigInt(sellOrder.matched) + BigInt(1))
 			};
 			context.Order.set(updatedSellOrder);
 
